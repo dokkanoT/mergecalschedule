@@ -1,0 +1,9 @@
+import "server-only";
+import { Pool } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import * as schema from "./schema";
+
+// トランザクションを使うため HTTP ドライバではなく Pool（WebSocket）を使う
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+export const db = drizzle({ client: pool, schema, casing: "snake_case" });
