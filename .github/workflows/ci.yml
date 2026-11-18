@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: lint・型チェック・ビルド
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # ビルド時に Better Auth が読むだけのダミー値（本番の値ではない）
+      BETTER_AUTH_SECRET: ci-dummy-secret-not-used-anywhere-0000
+      BETTER_AUTH_URL: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm のバージョンは package.json の packageManager から読む
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: 依存パッケージのインストール
+        run: pnpm install --frozen-lockfile
+
+      - name: lint
+        run: pnpm lint
+
+      - name: 型チェック
+        run: pnpm typecheck
+
+      # テストはタスク4（ルール判定）で Vitest を入れたらここに足す
+      # - name: テスト
+      #   run: pnpm test
+
+      - name: ビルド
+        run: pnpm build
