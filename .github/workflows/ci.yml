@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   check:
-    name: lint・型チェック・ビルド
+    name: lint・型チェック・テスト・ビルド
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -39,9 +39,8 @@ jobs:
       - name: 型チェック
         run: pnpm typecheck
 
-      # テストはタスク4（ルール判定）で Vitest を入れたらここに足す
-      # - name: テスト
-      #   run: pnpm test
+      - name: テスト（ルール判定・稼働日・遅れ判定）
+        run: pnpm test
 
       - name: ビルド
         run: pnpm build
