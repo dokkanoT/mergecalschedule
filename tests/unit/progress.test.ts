@@ -4,6 +4,7 @@ import {
   currentTask,
   delayWorkdays,
   expectedProgressPct,
+  isOnStatusLine,
   lightningOffset,
   lightningPoints,
   nextTask,
@@ -11,7 +12,9 @@ import {
   overallProgressPct,
   plannedWorkdays,
   progressStatus,
+  onTrackThreshold,
   remainingWorkdays,
+  statusLinePosition,
 } from "@/lib/progress";
 
 // 11/30(月)〜12/04(金) の 5 稼働日タスク
@@ -75,19 +78,41 @@ describe("遅れ判定", () => {
     expect(progressStatus({ ...overWeekend, progressPct: 50 }, "2026-11-29")).toBe("on_track");
   });
 
-  it("割り切れない率でも、同じ値なら予定どおり（3 日タスクの 1 日目 = 33.33…%）", () => {
+  it("割り切れない率は切り捨てで比べる（3 日タスクの 1 日目 = 33.33…%）", () => {
     const threeDays = { plannedStart: "2026-11-30", plannedEnd: "2026-12-02" };
     const expected = expectedProgressPct(threeDays, "2026-11-30");
+    expect(onTrackThreshold(expected)).toBe(33);
     expect(compareProgress(expected, expected)).toBe("on_track");
-    expect(progressStatus({ ...threeDays, progressPct: 33 }, "2026-11-30")).toBe("behind");
+    expect(progressStatus({ ...threeDays, progressPct: 32 }, "2026-11-30")).toBe("behind");
+    expect(progressStatus({ ...threeDays, progressPct: 33 }, "2026-11-30")).toBe("on_track");
     expect(progressStatus({ ...threeDays, progressPct: 34 }, "2026-11-30")).toBe("ahead");
   });
 
-  it("遅れ日数（稼働日、切り上げ）", () => {
+  it("3 日タスクの 2 日目（66.66…%）：66% は予定どおり、67% は先行、65% は遅れ", () => {
+    const threeDays = { plannedStart: "2026-11-30", plannedEnd: "2026-12-02" };
+    expect(progressStatus({ ...threeDays, progressPct: 66 }, "2026-12-01")).toBe("on_track");
+    expect(progressStatus({ ...threeDays, progressPct: 67 }, "2026-12-01")).toBe("ahead");
+    expect(progressStatus({ ...threeDays, progressPct: 65 }, "2026-12-01")).toBe("behind");
+  });
+
+  it("割り切れる率は切り捨てても同じ（あるべき 60% に 59% は遅れ）", () => {
+    expect(onTrackThreshold(60)).toBe(60);
+    expect(progressStatus({ ...week, progressPct: 59 }, "2026-12-02")).toBe("behind");
+  });
+
+  it("遅れ日数（稼働日、小数第1位まで）", () => {
     expect(delayWorkdays({ ...week, progressPct: 40 }, "2026-12-02")).toBe(1); // 3日分 − 2日分
     expect(delayWorkdays({ ...week, progressPct: 0 }, "2026-12-04")).toBe(5);
-    expect(delayWorkdays({ ...week, progressPct: 50 }, "2026-12-02")).toBe(1); // 0.5 日 → 1
+    expect(delayWorkdays({ ...week, progressPct: 50 }, "2026-12-02")).toBe(0.5);
+    expect(delayWorkdays({ ...week, progressPct: 32 }, "2026-12-02")).toBe(1.4); // (60 − 32)% × 5 日
     expect(delayWorkdays({ ...week, progressPct: 80 }, "2026-12-02")).toBe(0); // 先行
+    expect(delayWorkdays({ ...week, progressPct: 60 }, "2026-12-02")).toBe(0); // 予定どおり
+  });
+
+  it("遅れ日数：予定どおりの範囲（切り捨て）なら 0、ごく小さな遅れは 0.1", () => {
+    const threeDays = { plannedStart: "2026-11-30", plannedEnd: "2026-12-02" };
+    expect(delayWorkdays({ ...threeDays, progressPct: 33 }, "2026-11-30")).toBe(0);
+    expect(delayWorkdays({ ...oneDay, progressPct: 99 }, "2026-12-02")).toBe(0.1); // 0.01 日
   });
 });
 
@@ -115,7 +140,7 @@ describe("イナズマ線", () => {
     expect(pos).toEqual({ date: "2026-12-02", fraction: 1 });
   });
 
-  it("上から順に点を作り、遅れ・先行を付ける", () => {
+  it("上から順に点を作り、遅れ・先行を付ける。完了済みは縦線の上", () => {
     const points = lightningPoints(
       [
         { id: "a", ...week, progressPct: 40 },
@@ -123,10 +148,39 @@ describe("イナズマ線", () => {
       ],
       "2026-12-02",
     );
-    expect(points.map((p) => [p.task.id, p.position.date, p.position.fraction, p.status])).toEqual([
-      ["a", "2026-12-01", 1, "behind"],
-      ["b", "2026-12-01", 1, "on_track"],
+    expect(
+      points.map((p) => [p.task.id, p.position.date, p.position.fraction, p.status, p.onStatusLine]),
+    ).toEqual([
+      ["a", "2026-12-01", 1, "behind", false],
+      ["b", "2026-12-02", 1, "on_track", true],
     ]);
+  });
+
+  it("未着手（開始前で 0%）は縦線の上、開始前に進めていれば実際の位置（先行）", () => {
+    const later = { plannedStart: "2026-12-07", plannedEnd: "2026-12-08" };
+    const [notStarted, early] = lightningPoints(
+      [
+        { ...later, progressPct: 0 },
+        { ...later, progressPct: 50 },
+      ],
+      "2026-12-02",
+    );
+    expect(notStarted.onStatusLine).toBe(true);
+    expect(notStarted.position).toEqual(statusLinePosition("2026-12-02"));
+    expect(notStarted.status).toBe("on_track");
+    expect(early.onStatusLine).toBe(false);
+    expect(early.position).toEqual({ date: "2026-12-07", fraction: 1 });
+    expect(early.status).toBe("ahead");
+  });
+
+  it("期間中で 0% は縦線に置かない（遅れとして左に曲がる）", () => {
+    expect(isOnStatusLine({ ...week, progressPct: 0 }, "2026-12-02")).toBe(false);
+    expect(isOnStatusLine({ ...week, progressPct: 0 }, "2026-11-30")).toBe(false); // 開始日当日
+    expect(isOnStatusLine({ ...week, progressPct: 100 }, "2026-11-30")).toBe(true); // 早く完了
+  });
+
+  it("縦線の位置は進捗管理日の終わり", () => {
+    expect(statusLinePosition("2026-12-02")).toEqual({ date: "2026-12-02", fraction: 1 });
   });
 });
 

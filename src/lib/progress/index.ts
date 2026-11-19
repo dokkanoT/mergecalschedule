@@ -34,9 +34,21 @@ export function expectedProgressPct(task: PlannedTask, statusDate: IsoDate): num
   return Math.min(Math.max(elapsed / d, 0), 1) * 100;
 }
 
-/** 実際の進捗率とあるべき進捗率を比べる。下回れば遅れ、上回れば先行 */
+/**
+ * 「予定どおり」とみなす下限。あるべき率の小数を切り捨てた値。
+ * 進捗率は整数で入力するので、3 日タスクの 1 日目（33.33…%）は 33% で予定どおりにする。
+ */
+export function onTrackThreshold(expectedPct: number): number {
+  return Math.floor(expectedPct + EPSILON);
+}
+
+/**
+ * 実際の進捗率とあるべき進捗率を比べる。
+ * 切り捨てた値（onTrackThreshold）を下回れば遅れ、あるべき率を上回れば先行、その間は予定どおり。
+ * 例：あるべき 33.33…% → 32% は遅れ、33% は予定どおり、34% は先行。
+ */
 export function compareProgress(progressPct: number, expectedPct: number): ProgressStatus {
-  if (progressPct < expectedPct - EPSILON) return "behind";
+  if (progressPct < onTrackThreshold(expectedPct) - EPSILON) return "behind";
   if (progressPct > expectedPct + EPSILON) return "ahead";
   return "on_track";
 }
@@ -46,13 +58,14 @@ export function progressStatus(task: PlannedTask & { progressPct: number }, stat
 }
 
 /**
- * 遅れ日数（稼働日、切り上げ）。遅れていなければ 0。
- * あるべき位置と実際の位置（どちらも D × 率）の差。
+ * 遅れ日数（稼働日、小数第1位まで）。遅れていなければ 0。
+ * あるべき位置と実際の位置（どちらも D × 率）の差。遅れているのに 0.0 日と出ないよう、最小 0.1。
  */
 export function delayWorkdays(task: PlannedTask & { progressPct: number }, statusDate: IsoDate): number {
-  const d = plannedWorkdays(task);
-  const gap = ((expectedProgressPct(task, statusDate) - task.progressPct) / 100) * d;
-  return gap > EPSILON ? Math.ceil(gap - EPSILON) : 0;
+  const expected = expectedProgressPct(task, statusDate);
+  if (compareProgress(task.progressPct, expected) !== "behind") return 0;
+  const gap = ((expected - task.progressPct) / 100) * plannedWorkdays(task);
+  return Math.max(0.1, Math.round(gap * 10 + EPSILON) / 10);
 }
 
 /** イナズマ線の点：planned_start から D × progress_pct / 100 稼働日進んだ位置（稼働日のオフセット、小数あり） */
@@ -79,25 +92,48 @@ export function offsetToGridPosition(plannedStart: IsoDate, offset: number): Gri
   return { date: addWorkdays(first, whole), fraction: offset - whole };
 }
 
+/** 進捗管理日の縦線の位置（その日の終わり） */
+export function statusLinePosition(statusDate: IsoDate): GridPosition {
+  return { date: statusDate, fraction: 1 };
+}
+
+/**
+ * イナズマ線の点を縦線の上に置くタスクか。
+ * 完了済み（100%）と、未着手（開始日が進捗管理日より後で 0%）のタスク。
+ * フェーズ行も縦線の上に置く（タスクではないのでガント側で statusLinePosition を使う）。
+ */
+export function isOnStatusLine(task: PlannedTask & { progressPct: number }, statusDate: IsoDate): boolean {
+  if (task.progressPct >= 100) return true;
+  return task.plannedStart > statusDate && task.progressPct <= 0;
+}
+
 export type LightningPoint<T> = {
   task: T;
   position: GridPosition;
   status: ProgressStatus;
+  /** 縦線の上に置いた点か（完了済み・未着手） */
+  onStatusLine: boolean;
 };
 
 /**
  * イナズマ線の点の列。tasks はガントの上から順に渡す（この順につなぐ）。
- * 進捗管理日より左の点は遅れ、右は先行。
+ * 進捗管理日より左の点は遅れ、右は先行。完了済み・未着手は縦線の上。
  */
 export function lightningPoints<T extends PlannedTask & { progressPct: number }>(
   tasks: readonly T[],
   statusDate: IsoDate,
 ): LightningPoint<T>[] {
-  return tasks.map((task) => ({
-    task,
-    position: offsetToGridPosition(task.plannedStart, lightningOffset(task)),
-    status: progressStatus(task, statusDate),
-  }));
+  return tasks.map((task) => {
+    const onStatusLine = isOnStatusLine(task, statusDate);
+    return {
+      task,
+      position: onStatusLine
+        ? statusLinePosition(statusDate)
+        : offsetToGridPosition(task.plannedStart, lightningOffset(task)),
+      status: progressStatus(task, statusDate),
+      onStatusLine,
+    };
+  });
 }
 
 /** プロジェクト全体の進捗率（予定日数で重み付けした平均、0〜100）。タスクがなければ 0 */
