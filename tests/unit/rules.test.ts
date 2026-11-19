@@ -45,6 +45,7 @@ describe("validateTaskDates（R0）", () => {
     expect(issues).toHaveLength(1);
     expect(issues[0].field).toBe("plannedStart");
     expect(issues[0].message).toContain("勤労感謝の日");
+    expect(issues[0].message).toContain("11/23（月）");
   });
 
   it("土日を開始日・終了日にすると拒否", () => {
