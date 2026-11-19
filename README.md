@@ -75,7 +75,7 @@ ALTER TABLE tasks ADD CONSTRAINT no_parallel_tasks
 - [x] ルール判定・テスト（稼働日計算、R0〜R5、遅れ判定・イナズマ線。Vitest）
 - [x] プロジェクト・招待（招待リンクからだけ登録できる。メンバーでないプロジェクトは見えない）
 - [x] WBS 編集（3階層の表、ルールチェック欄、並列禁止をプロジェクト横断で入力中に表示）
-- [ ] ガントチャート＋イナズマ線
+- [x] ガントチャート＋イナズマ線（予定・実績バー、予備期間の帯、進捗管理日の切り替え）
 - [ ] メンバーボード
 - [ ] 困りごと
 - [ ] 工程表 xlsx 出力
@@ -159,6 +159,7 @@ src/
     shell/          サイドバー・ヘッダー
     projects/       プロジェクトのフォーム
     wbs/            WBS 編集（表・タスク編集モーダル・ルールチェック欄）
+    gantt/          ガントチャート（日付グリッド・バー・イナズマ線の SVG）
     ui/             shadcn/ui の部品
   db/
     schema.ts       Drizzle のスキーマ
@@ -168,6 +169,7 @@ src/
     invitations/    招待の期限・入力チェック
     format/         日付・日数の表示（11/19（木）、n稼働日）
     wbs/            WBS の並べ替え・ルールチェック欄（純粋関数）、読み込みと並列チェック（server.ts）
+    gantt/          ガントの表示範囲・バー・イナズマ線の頂点（純粋関数）、読み込み（server.ts）
     calendar/       稼働日の計算（R0）：isWorkday、workdaysBetween、addWorkdays など
     rules/          WBS ルールの判定（R0〜R5）：重なり・次の空き日・バッファ・ファイル名
     progress/       遅れ判定・イナズマ線・メンバーカード用の計算
