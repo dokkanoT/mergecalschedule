@@ -1,5 +1,6 @@
 // R0：タスクの予定日・実績日に休日（土日祝）は選べない
 import { type IsoDate, isIsoDate, nonWorkdayReason } from "@/lib/calendar";
+import { formatDateWithWeekday } from "@/lib/format";
 import type { RuleIssue } from "./types";
 
 export type TaskDatesInput = {
@@ -22,7 +23,7 @@ function checkDay(field: keyof typeof LABELS, value: string): RuleIssue | null {
   }
   const reason = nonWorkdayReason(value);
   if (reason) {
-    return { field, message: `${LABELS[field]}（${value}）は${reason}です。稼働日（平日）を選んでください。` };
+    return { field, message: `${LABELS[field]}（${formatDateWithWeekday(value)}）は${reason}です。稼働日（平日）を選んでください。` };
   }
   return null;
 }

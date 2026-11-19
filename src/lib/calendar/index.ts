@@ -134,3 +134,12 @@ export function todayInTokyo(now: Date = new Date()): IsoDate {
     day: "2-digit",
   }).format(now);
 }
+
+/** start〜end（両端含む）にある休み（土日祝）の日の一覧。「○/○ は土日祝のため数えない」の表示用 */
+export function nonWorkdaysBetween(start: IsoDate, end: IsoDate): IsoDate[] {
+  const days: IsoDate[] = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    if (!isWorkday(d)) days.push(d);
+  }
+  return days;
+}
