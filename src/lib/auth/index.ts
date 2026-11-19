@@ -13,6 +13,12 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 8,
   },
+  user: {
+    additionalFields: {
+      // 肩書き（任意）。招待から登録するときに入力する
+      title: { type: "string", required: false, input: true },
+    },
+  },
   // nextCookies は plugins の最後に置く（Server Action から cookie を設定するため）
   plugins: [nextCookies()],
 });

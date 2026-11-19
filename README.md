@@ -71,8 +71,8 @@ ALTER TABLE tasks ADD CONSTRAINT no_parallel_tasks
 
 - [x] 要件確定
 - [x] 環境構築・認証（メール＋パスワードでログイン、日本語 PDF の試作）
-- [ ] DB 設計（R1〜R3 の制約入りマイグレーション）
-- [ ] ルール判定・テスト（稼働日計算、R1〜R5、遅れ判定）
+- [x] DB 設計（R0〜R4 の制約入りマイグレーション、`pnpm db:check` で確認）
+- [x] ルール判定・テスト（稼働日計算、R0〜R5、遅れ判定・イナズマ線。Vitest 115 件）
 - [ ] プロジェクト・招待
 - [ ] WBS 編集
 - [ ] ガントチャート＋イナズマ線
@@ -98,7 +98,7 @@ ALTER TABLE tasks ADD CONSTRAINT no_parallel_tasks
 | PDF 出力 | @react-pdf/renderer + Noto Sans JP（`public/fonts/` に同梱） |
 | 祝日判定 | @holiday-jp/holiday_jp |
 | テスト | Vitest（ルール判定）+ Playwright（主要な流れ） |
-| CI | GitHub Actions（lint・型チェック・ビルド） |
+| CI | GitHub Actions（lint・型チェック・テスト・ビルド） |
 | ホスティング / CD | Vercel（関数は Neon と同じシンガポールで動かす） |
 
 ## 動かし方
@@ -134,8 +134,11 @@ http://localhost:3000 を開くとログイン画面が出ます。「アカウ�
 | `pnpm build` | 本番ビルド |
 | `pnpm lint` | コード解析 |
 | `pnpm typecheck` | 型チェック |
+| `pnpm test` | ルール判定のテスト（Vitest）を1回実行 |
+| `pnpm test:watch` | 変更を監視してテスト |
 | `pnpm db:generate` | `src/db/schema.ts` の変更からマイグレーションを作る |
 | `pnpm db:migrate` | マイグレーションを DB に適用する |
+| `pnpm db:check` | DB の制約（R0〜R4）が効いているかを確かめる（ロールバックするのでデータは残らない） |
 
 DB のスキーマを変えたら、必ず `pnpm db:generate` でマイグレーションを作り、SQL を読んで確かめてから `pnpm db:migrate` します。本番の DB に直接 `push` はしません。
 
@@ -154,17 +157,21 @@ src/
     migrations/     drizzle-kit で作ったマイグレーション
   lib/
     auth/           Better Auth の設定、ログイン必須チェック
+    calendar/       稼働日の計算（R0）：isWorkday、workdaysBetween、addWorkdays など
+    rules/          WBS ルールの判定（R0〜R5）：重なり・次の空き日・バッファ・ファイル名
+    progress/       遅れ判定・イナズマ線・メンバーカード用の計算
+    project-style/  プロジェクトの6色とアイコン（画面デザインのトークン）
     export/         xlsx / PDF の生成（いまは日本語フォントの登録だけ）
   proxy.ts          未ログインならログイン画面へ送る
+tests/unit/         Vitest（calendar・rules・progress）
+scripts/            DB 制約の確認スクリプト
 public/fonts/       PDF 用の日本語フォント（Noto Sans JP）
-docs/               開発計画書
+docs/               開発計画書、画面デザイン（SCREENS.md）、開発記録
 ```
-
-これから `lib/calendar/`（稼働日計算）、`lib/rules/`（R1〜R5 の判定）、`lib/progress/`（遅れ判定・イナズマ線）が増えます。
 
 ## CI
 
-GitHub Actions で、プルリクエストと main への push のたびに、lint・型チェック・ビルドを実行します（[.github/workflows/ci.yml](.github/workflows/ci.yml)）。ルール判定の Vitest は、タスク4で入れたらここに足します。
+GitHub Actions で、プルリクエストと main への push のたびに、lint・型チェック・テスト・ビルドを実行します（[.github/workflows/ci.yml](.github/workflows/ci.yml)）。
 
 ## 開発の進め方
 

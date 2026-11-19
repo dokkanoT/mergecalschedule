@@ -8,6 +8,27 @@
       "when": 1794968317661,
       "tag": "0000_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794972531199,
+      "tag": "0001_app_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794972536496,
+      "tag": "0002_no_parallel_tasks",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795049414453,
+      "tag": "0003_project_style_user_title",
+      "breakpoints": true
     }
   ]
 }
