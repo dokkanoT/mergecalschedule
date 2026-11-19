@@ -2,17 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { primaryButtonClass } from "@/components/common/buttons";
+import { Field, inputClass } from "@/components/common/field";
+import { RuleAlert } from "@/components/common/rule-alert";
 import { authClient } from "@/lib/auth/client";
 
 type Mode = "signIn" | "signUp";
 
-export function LoginForm() {
+type Props = {
+  /** signUp はユーザーが0人のときだけ（最初の1人） */
+  mode: Mode;
+  /** ログイン後の戻り先（サイト内のパス） */
+  nextPath: string;
+};
+
+export function LoginForm({ mode, nextPath }: Props) {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("signIn");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -24,10 +29,11 @@ export function LoginForm() {
     const email = String(form.get("email") ?? "");
     const password = String(form.get("password") ?? "");
     const name = String(form.get("name") ?? "");
+    const title = String(form.get("title") ?? "").trim();
 
     const { error } =
       mode === "signUp"
-        ? await authClient.signUp.email({ email, password, name })
+        ? await authClient.signUp.email({ email, password, name, title: title === "" ? undefined : title })
         : await authClient.signIn.email({ email, password });
 
     setPending(false);
@@ -35,59 +41,69 @@ export function LoginForm() {
       setError(toJapaneseMessage(error.code, mode));
       return;
     }
-    router.replace("/board");
+    router.replace(mode === "signUp" ? "/projects/new" : nextPath);
     router.refresh();
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{mode === "signIn" ? "ログイン" : "新規登録"}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={onSubmit} className="space-y-4">
-          {mode === "signUp" && (
-            <div className="space-y-2">
-              <Label htmlFor="name">名前</Label>
-              <Input id="name" name="name" required autoComplete="name" />
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="email">メールアドレス</Label>
-            <Input id="email" name="email" type="email" required autoComplete="email" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">パスワード（8文字以上）</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              autoComplete={mode === "signUp" ? "new-password" : "current-password"}
-            />
-          </div>
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "処理中…" : mode === "signIn" ? "ログイン" : "登録する"}
-          </Button>
-        </form>
-        <button
-          type="button"
-          className="mt-4 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
-          onClick={() => {
-            setError(null);
-            setMode(mode === "signIn" ? "signUp" : "signIn");
-          }}
-        >
-          {mode === "signIn" ? "アカウントをお持ちでない方はこちら" : "ログインに戻る"}
-        </button>
-      </CardContent>
-    </Card>
+    <form onSubmit={onSubmit} className="space-y-4" noValidate>
+      {mode === "signUp" && (
+        <>
+          <p className="text-[13px] text-ink-2">
+            まだ誰も登録していません。最初の1人として登録すると、プロジェクトを作って仲間を招待できます。2人目からは招待リンクで登録します。
+          </p>
+          <Field id="name" label="名前" required>
+            {(c) => <input {...c} name="name" required className={inputClass} autoComplete="name" />}
+          </Field>
+          <Field id="title" label="肩書き" hint="任意">
+            {(c) => <input {...c} name="title" className={inputClass} autoComplete="organization-title" />}
+          </Field>
+        </>
+      )}
+      <Field id="email" label="メールアドレス" required>
+        {(c) => (
+          <input
+            {...c}
+            id="email"
+            name="email"
+            type="email"
+            required
+            className={inputClass}
+            autoComplete="email"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "login-error" : undefined}
+          />
+        )}
+      </Field>
+      <Field id="password" label="パスワード" required hint={mode === "signUp" ? "8文字以上" : undefined}>
+        {(c) => (
+          <input
+            {...c}
+            name="password"
+            type="password"
+            required
+            minLength={8}
+            className={inputClass}
+            autoComplete={mode === "signUp" ? "new-password" : "current-password"}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "login-error" : c["aria-describedby"]}
+          />
+        )}
+      </Field>
+      {error && (
+        <div id="login-error">
+          <RuleAlert tone="error" title={error} />
+        </div>
+      )}
+      <button type="submit" className={`${primaryButtonClass} w-full`} disabled={pending}>
+        {pending ? "処理中…" : mode === "signIn" ? "ログイン" : "登録する"}
+      </button>
+      {mode === "signIn" && (
+        <p className="text-center text-[13px] text-muted-foreground">
+          アカウントは招待リンクから作ります。招待してくれた人にリンクを送ってもらってください。
+        </p>
+      )}
+    </form>
   );
 }
 
@@ -102,6 +118,8 @@ function toJapaneseMessage(code: string | undefined, mode: Mode): string {
       return "パスワードは8文字以上にしてください。";
     case "INVALID_EMAIL":
       return "メールアドレスの形式が正しくありません。";
+    case "INVITATION_REQUIRED":
+      return "招待されたメールアドレスだけ登録できます。招待リンクから登録してください。";
     default:
       return mode === "signUp" ? "登録に失敗しました。" : "ログインに失敗しました。";
   }

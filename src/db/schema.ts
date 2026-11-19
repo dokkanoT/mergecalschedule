@@ -168,7 +168,10 @@ export const invitations = pgTable(
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
+    // 小文字にそろえて入れる（src/lib/invitations の normalizeEmail）
     email: text("email").notNull(),
+    // 招待を受けたときの役割
+    role: projectRole("role").notNull().default("member"),
     token: text("token").notNull().unique(),
     invitedBy: text("invited_by").references(() => user.id, { onDelete: "set null" }),
     // 7日で失効（値はサーバーで created_at + 7日 を入れる）

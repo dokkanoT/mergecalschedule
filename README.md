@@ -73,7 +73,7 @@ ALTER TABLE tasks ADD CONSTRAINT no_parallel_tasks
 - [x] 環境構築・認証（メール＋パスワードでログイン、日本語 PDF の試作）
 - [x] DB 設計（R0〜R4 の制約入りマイグレーション、`pnpm db:check` で確認）
 - [x] ルール判定・テスト（稼働日計算、R0〜R5、遅れ判定・イナズマ線。Vitest 115 件）
-- [ ] プロジェクト・招待
+- [x] プロジェクト・招待（招待リンクからだけ登録できる。メンバーでないプロジェクトは見えない）
 - [ ] WBS 編集
 - [ ] ガントチャート＋イナズマ線
 - [ ] メンバーボード
@@ -126,7 +126,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-http://localhost:3000 を開くとログイン画面が出ます。「アカウントをお持ちでない方はこちら」から登録できます。
+http://localhost:3000 を開くとログイン画面が出ます。ユーザーがまだ1人もいないときだけ、ここで最初の1人を登録できます。2人目からは、プロジェクトの設定画面で作った招待リンクから登録します。
 
 | コマンド | 内容 |
 |---|---|
@@ -147,16 +147,25 @@ DB のスキーマを変えたら、必ず `pnpm db:generate` でマイグレー
 ```
 src/
   app/
-    login/          ログイン・新規登録
-    board/          メンバーボード（いまは仮）
+    login/          ログイン（最初の1人だけここで登録）
+    invite/[token]/ 招待の受諾（招待から登録・参加）
+    (app)/          ログイン後の画面（サイドバー付きの共通レイアウト）
+      board/        チームボード（いまは仮）
+      projects/     プロジェクト一覧・作成・設定（招待・役割）
     api/auth/       Better Auth の API
     api/pdf-test/   日本語 PDF の確認用（PDF 出力の本実装で置き換える）
-  components/ui/    shadcn/ui の部品
+  components/
+    common/         画面共通の部品（ProjectTile・Field・RuleAlert・ボタンなど）
+    shell/          サイドバー・ヘッダー
+    projects/       プロジェクトのフォーム
+    ui/             shadcn/ui の部品
   db/
     schema.ts       Drizzle のスキーマ
     migrations/     drizzle-kit で作ったマイグレーション
   lib/
-    auth/           Better Auth の設定、ログイン必須チェック
+    auth/           Better Auth の設定、ログイン必須・プロジェクトの権限チェック
+    invitations/    招待の期限・入力チェック
+    format/         日付・日数の表示（11/19（木）、n稼働日）
     calendar/       稼働日の計算（R0）：isWorkday、workdaysBetween、addWorkdays など
     rules/          WBS ルールの判定（R0〜R5）：重なり・次の空き日・バッファ・ファイル名
     progress/       遅れ判定・イナズマ線・メンバーカード用の計算

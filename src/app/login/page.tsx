@@ -1,21 +1,21 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { AuthCard } from "@/components/shell/auth-card";
+import { getSession, isFirstUser } from "@/lib/auth";
+import { safeNextPath } from "@/lib/invitations";
 import { LoginForm } from "./login-form";
 
-export default async function LoginPage() {
-  if (await getSession()) redirect("/board");
+export const metadata = { title: "ログイン | マジスケ" };
 
+export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+  const { next } = await searchParams;
+  const nextPath = safeNextPath(typeof next === "string" ? next : null);
+  if (await getSession()) redirect(nextPath);
+
+  // 新規登録は招待リンクから。ユーザーがまだ1人もいないときだけ、ここで最初の1人を登録できる
+  const firstUser = await isFirstUser();
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-12">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-bold">マジスケ</h1>
-          <p className="text-sm text-muted-foreground">
-            プロジェクト横断のスケジュール管理
-          </p>
-        </div>
-        <LoginForm />
-      </div>
-    </main>
+    <AuthCard title={firstUser ? "最初の1人を登録" : "ログイン"}>
+      <LoginForm mode={firstUser ? "signUp" : "signIn"} nextPath={nextPath} />
+    </AuthCard>
   );
 }
