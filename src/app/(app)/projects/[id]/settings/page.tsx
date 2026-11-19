@@ -10,10 +10,11 @@ import { todayInTokyo } from "@/lib/calendar";
 import { formatDateWithWeekday } from "@/lib/format";
 import { invitationState, roleLabel } from "@/lib/invitations";
 import { updateProject } from "../../actions";
-import { changeMemberRole, createInvitation, revokeInvitation } from "./actions";
+import { changeMemberRole, createInvitation, removeMember, revokeInvitation } from "./actions";
 import { CopyLinkButton } from "./copy-link-button";
 import { InviteForm } from "./invite-form";
 import { MemberRoleButton } from "./member-role-button";
+import { RemoveMemberButton } from "./remove-member-button";
 import { RevokeInvitationButton } from "./revoke-button";
 
 export const metadata = { title: "プロジェクト設定 | マジスケ" };
@@ -99,12 +100,17 @@ export default async function ProjectSettingsPage({ params, searchParams }: Page
                 <span className="rounded-full bg-background px-2.5 py-1 text-[12px] font-bold text-ink-2">
                   {roleLabel(m.role)}
                 </span>
-                <MemberRoleButton
-                  memberName={m.name}
-                  currentRole={m.role}
-                  isSelf={m.userId === me.id}
-                  action={changeMemberRole.bind(null, id, m.userId)}
-                />
+                <div className="flex flex-wrap items-start justify-end gap-2">
+                  <MemberRoleButton
+                    memberName={m.name}
+                    currentRole={m.role}
+                    isSelf={m.userId === me.id}
+                    action={changeMemberRole.bind(null, id, m.userId)}
+                  />
+                  {m.userId !== me.id && (
+                    <RemoveMemberButton memberName={m.name} action={removeMember.bind(null, id, m.userId)} />
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -116,7 +122,7 @@ export default async function ProjectSettingsPage({ params, searchParams }: Page
               メンバーを招待
             </h2>
             <p className="text-[13px] text-muted-foreground">
-              招待リンクを作って本人に渡してください。リンクから登録・参加できます。7日で失効します。
+              招待リンクを作って本人に渡してください。リンクを持っている人なら誰でも、そのメールアドレスで登録できてしまいます。本人以外に見えるところには貼らないでください。7日で失効します。
             </p>
           </div>
           <InviteForm action={createInvitation.bind(null, id)} />
