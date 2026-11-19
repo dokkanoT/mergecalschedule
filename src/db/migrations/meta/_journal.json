@@ -29,6 +29,13 @@
       "when": 1795049414453,
       "tag": "0003_project_style_user_title",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795050548938,
+      "tag": "0004_invitation_role",
+      "breakpoints": true
     }
   ]
 }
