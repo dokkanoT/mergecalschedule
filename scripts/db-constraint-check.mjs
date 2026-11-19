@@ -124,6 +124,10 @@ try {
   await expect("別プロジェクトのフェーズにタスクを付ける", "23503", insertTask, task(pA, phB, "chk_u2", "2026-12-22", "2026-12-22"));
   await expect("R4 バッファ0日", "23514", `insert into projects (name, deadline, buffer_days) values ('x', '2027-01-08', 0)`);
   await expect("R5 週の最終曜日が土曜（6）", "23514", `insert into projects (name, deadline, buffer_days, week_end_weekday) values ('x', '2027-01-08', 3, 6)`);
+  await expect("プロジェクト色がパレット外（#3b82f6）", "23514", `insert into projects (name, deadline, buffer_days, color) values ('x', '2027-01-08', 3, '#3b82f6')`);
+  await expect("プロジェクト色・アイコンの既定値（紫・カレンダー）", "ok", `insert into projects (name, deadline, buffer_days) values ('x', '2027-01-08', 3) returning 1 / (color = '#7C5CFA' and icon = 'calendar')::int`);
+  await expect("プロジェクトのアイコンが空白", "23514", `insert into projects (name, deadline, buffer_days, icon) values ('x', '2027-01-08', 3, ' ')`);
+  await expect("ユーザーの肩書きは空でもよい", "ok", `update "user" set title = null where id = 'chk_u1'`);
   await expect("WBS 親のないフェーズ", "23514", `insert into wbs_nodes (project_id, level, name) values ($1, 'phase', 'x')`, [pA]);
   await expect("担当タスクがあるメンバーは外せない", "23503", `delete from project_members where project_id = $1 and user_id = 'chk_u1'`, [pA]);
   await expect("プロジェクト削除で配下がまとめて消える", "ok", `delete from projects where id = $1`, [pA]);

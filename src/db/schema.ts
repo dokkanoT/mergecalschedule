@@ -14,6 +14,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import { DEFAULT_PROJECT_COLOR, DEFAULT_PROJECT_ICON, PROJECT_COLORS } from "../lib/project-style"; // drizzle-kit が @ の別名を解決できないため相対パス
 
 // ---------------------------------------------------------------------------
 // 認証（Better Auth のコアスキーマ）
@@ -25,6 +26,8 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
+  // 肩書き（任意。メンバーカードで名前の下に出す）。Better Auth の additionalFields
+  title: text("title"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
@@ -111,7 +114,10 @@ export const projects = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
-    color: text("color").notNull().default("#3b82f6"),
+    // 色は 6 色のパレットから選ぶ（src/lib/project-style）
+    color: text("color").notNull().default(DEFAULT_PROJECT_COLOR),
+    // lucide-react のアイコン名。一覧の確認はサーバーで行う
+    icon: text("icon").notNull().default(DEFAULT_PROJECT_ICON),
     // R4：締切とバッファは利用者が入力する（コードに固定値を書かない）
     deadline: date("deadline", { mode: "string" }).notNull(),
     bufferDays: integer("buffer_days").notNull(),
@@ -128,7 +134,11 @@ export const projects = pgTable(
   },
   (t) => [
     check("projects_name_not_blank", notBlank(t.name)),
-    check("projects_color_hex", sql`${t.color} ~ '^#[0-9a-fA-F]{6}$'`),
+    check(
+      "projects_color_palette",
+      sql`${t.color} in (${sql.raw(PROJECT_COLORS.map((c) => `'${c.color}'`).join(", "))})`,
+    ),
+    check("projects_icon_not_blank", notBlank(t.icon)),
     check("projects_buffer_days_min", sql`${t.bufferDays} >= 1`),
     check("projects_week_end_weekday_range", sql`${t.weekEndWeekday} between 1 and 5`),
     check("projects_xlsx_template_not_blank", notBlank(t.xlsxFileNameTemplate)),

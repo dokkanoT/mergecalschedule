@@ -72,7 +72,7 @@ ALTER TABLE tasks ADD CONSTRAINT no_parallel_tasks
 - [x] 要件確定
 - [x] 環境構築・認証（メール＋パスワードでログイン、日本語 PDF の試作）
 - [x] DB 設計（R0〜R4 の制約入りマイグレーション、`pnpm db:check` で確認）
-- [x] ルール判定・テスト（稼働日計算、R0〜R5、遅れ判定・イナズマ線。Vitest 105 件）
+- [x] ルール判定・テスト（稼働日計算、R0〜R5、遅れ判定・イナズマ線。Vitest 115 件）
 - [ ] プロジェクト・招待
 - [ ] WBS 編集
 - [ ] ガントチャート＋イナズマ線
@@ -160,12 +160,13 @@ src/
     calendar/       稼働日の計算（R0）：isWorkday、workdaysBetween、addWorkdays など
     rules/          WBS ルールの判定（R0〜R5）：重なり・次の空き日・バッファ・ファイル名
     progress/       遅れ判定・イナズマ線・メンバーカード用の計算
+    project-style/  プロジェクトの6色とアイコン（画面デザインのトークン）
     export/         xlsx / PDF の生成（いまは日本語フォントの登録だけ）
   proxy.ts          未ログインならログイン画面へ送る
 tests/unit/         Vitest（calendar・rules・progress）
 scripts/            DB 制約の確認スクリプト
 public/fonts/       PDF 用の日本語フォント（Noto Sans JP）
-docs/               開発計画書、開発記録
+docs/               開発計画書、画面デザイン（SCREENS.md）、開発記録
 ```
 
 ## CI

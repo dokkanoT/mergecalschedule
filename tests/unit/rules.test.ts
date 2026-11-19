@@ -22,6 +22,15 @@ import {
   validateTaskDates,
   type ScheduledTask,
 } from "@/lib/rules";
+import {
+  colorLabelOf,
+  DEFAULT_PROJECT_COLOR,
+  DEFAULT_PROJECT_ICON,
+  isProjectColor,
+  isProjectIcon,
+  PROJECT_COLORS,
+  tintOf,
+} from "@/lib/project-style";
 
 // ---------------------------------------------------------------------------
 // R0：タスクの日付
@@ -389,7 +398,8 @@ describe("R5 会議体", () => {
 describe("プロジェクト設定", () => {
   const valid = {
     name: "minebook",
-    color: "#22c55e",
+    color: "#1F9D6B",
+    icon: "book-open",
     deadline: "2027-01-08",
     bufferDays: 5,
     weekEndWeekday: 5,
@@ -410,5 +420,33 @@ describe("プロジェクト設定", () => {
       pdfFileNameTemplate: " ",
     });
     expect(issues.map((i) => i.field)).toEqual(["deadline", "bufferDays", "weekEndWeekday", "pdfFileNameTemplate"]);
+  });
+
+  it("色は 6 色のパレットだけ、アイコンは一覧にあるものだけ", () => {
+    const issues = validateProjectSettings({ ...valid, color: "#22c55e", icon: "skull" });
+    expect(issues.map((i) => i.field)).toEqual(["color", "icon"]);
+    expect(validateProjectSettings({ ...valid, color: "#7c5cfa" }).map((i) => i.field)).toEqual(["color"]);
+  });
+});
+
+describe("プロジェクトの色とアイコン", () => {
+  it("6 色すべてに薄い色と名前がある", () => {
+    expect(PROJECT_COLORS).toHaveLength(6);
+    for (const c of PROJECT_COLORS) {
+      expect(tintOf(c.color)).toMatch(/^#[0-9A-F]{6}$/);
+      expect(colorLabelOf(c.color)).toBe(c.label);
+    }
+  });
+
+  it("既定は紫とカレンダー", () => {
+    expect(DEFAULT_PROJECT_COLOR).toBe("#7C5CFA");
+    expect(tintOf(DEFAULT_PROJECT_COLOR)).toBe("#F1EDFF");
+    expect(isProjectIcon(DEFAULT_PROJECT_ICON)).toBe(true);
+    expect(DEFAULT_PROJECT_ICON).toBe("calendar");
+  });
+
+  it("パレットにない色は薄い色なし", () => {
+    expect(isProjectColor("#3b82f6")).toBe(false);
+    expect(tintOf("#3b82f6")).toBeNull();
   });
 });
