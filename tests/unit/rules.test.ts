@@ -7,6 +7,7 @@ import {
   duplicateForMembers,
   findOverlaps,
   formatYyMMdd,
+  HELP_BODY_MAX,
   isParallelTaskViolation,
   isStatusDay,
   lastPlannedEndOf,
@@ -17,6 +18,7 @@ import {
   suggestNextFreeStart,
   validateCompletion,
   validateDeliverable,
+  validateHelpBody,
   validateProjectSettings,
   validateTask,
   validateTaskDates,
@@ -449,5 +451,16 @@ describe("プロジェクトの色とアイコン", () => {
   it("パレットにない色は薄い色なし", () => {
     expect(isProjectColor("#3b82f6")).toBe(false);
     expect(tintOf("#3b82f6")).toBeNull();
+  });
+});
+
+describe("R5 困りごと", () => {
+  it("空・空白だけは出せない", () => {
+    expect(validateHelpBody("")).toHaveLength(1);
+    expect(validateHelpBody("  \n ")).toHaveLength(1);
+  });
+  it("500 文字まで", () => {
+    expect(validateHelpBody("あ".repeat(HELP_BODY_MAX))).toEqual([]);
+    expect(validateHelpBody("あ".repeat(HELP_BODY_MAX + 1))[0]?.message).toMatch("500");
   });
 });

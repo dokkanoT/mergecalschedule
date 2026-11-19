@@ -53,3 +53,22 @@ export function formatWorkdays(n: number): string {
 export function dayHeaderLabel(date: IsoDate): string {
   return isHoliday(date) ? "祝" : weekdayLabel(isoWeekday(date));
 }
+
+/** 日時を東京の時刻で "11/19（木）14:05" に。reference と年が違えば年を付ける */
+export function formatDateTime(value: Date, reference?: IsoDate): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(value)
+      .map((p) => [p.type, p.value]),
+  );
+  const date = `${parts.year}-${parts.month}-${parts.day}`;
+  return `${formatDateWithWeekday(date, reference)}${parts.hour}:${parts.minute}`;
+}
