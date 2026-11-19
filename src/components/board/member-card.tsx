@@ -2,17 +2,19 @@
 
 import { CalendarDays } from "lucide-react";
 import { useState } from "react";
-import { primaryButtonClass } from "@/components/common/buttons";
+import { primaryButtonClass, secondaryButtonClass } from "@/components/common/buttons";
 import { MemberAvatar } from "@/components/common/member-avatar";
 import { ProgressBar } from "@/components/common/progress-bar";
 import { ProjectDot, ProjectTile } from "@/components/common/project-tile";
 import { StatusPill, type StatusKind } from "@/components/common/status-pill";
 import { Toast } from "@/components/common/toast";
 import { type CardStatus, type MemberCard, OTHER_PROJECT_LABEL } from "@/lib/board";
-import type { LoadedBoardTask } from "@/lib/board/server";
+import type { LoadedBoardTask, OpenHelp } from "@/lib/board/server";
 import type { IsoDate } from "@/lib/calendar";
 import { formatDateWithWeekday, formatMonthDay, formatPeriod, formatWorkdays } from "@/lib/format";
 import { tintOf } from "@/lib/project-style";
+import { HelpBox } from "./help-box";
+import { HelpDialog } from "./help-dialog";
 import { ProgressDialog } from "./progress-dialog";
 import { TaskListDialog } from "./task-list-dialog";
 
@@ -28,19 +30,24 @@ type Props = {
   card: MemberCard;
   /** そのメンバーの全タスク（開始日の早い順） */
   tasks: LoadedBoardTask[];
+  /** そのメンバーの未解決の困りごと（見えるタスクのものだけ） */
+  helps: OpenHelp[];
   isMe: boolean;
   today: IsoDate;
 };
 
 /** メンバーカード（SCREENS.md §5-1）。1メンバー = 1枚 */
-export function MemberCardView({ card, tasks, isMe, today }: Props) {
-  const [dialog, setDialog] = useState<"list" | "progress" | null>(null);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
+export function MemberCardView({ card, tasks, helps, isMe, today }: Props) {
+  const [dialog, setDialog] = useState<"list" | "progress" | "help" | null>(null);
+  const [toast, setToast] = useState<{ at: number; message: string } | null>(null);
   const { member, current, next } = card;
   const pill = PILL[card.status];
   const currentTint = current?.visible ? tintOf(current.projectColor) : null;
   const subtitle = [isMe ? "あなた" : null, member.title].filter(Boolean).join(" · ");
   const ownTasks = tasks.filter((t) => t.own !== null);
+  // 自分のタスクを選ぶダイアログの初期値：いま → 期限切れ → つぎ → 先頭
+  const defaultTaskId =
+    [current, card.overdue[0], next].find((t) => t && ownTasks.some((o) => o.id === t.id))?.id ?? ownTasks[0]?.id ?? "";
 
   return (
     <article className="flex flex-col gap-5 rounded-card border border-border bg-surface p-5" aria-label={`${member.name}さん`}>
@@ -112,16 +119,17 @@ export function MemberCardView({ card, tasks, isMe, today }: Props) {
         </p>
       )}
 
-      {card.openHelpCount > 0 && (
-        <p className="rounded-2xl bg-help-bg px-4 py-3 text-[13px] font-bold text-help-ink">
-          未解決の困りごとが {card.openHelpCount}件 あります
-        </p>
+      {helps.length > 0 && (
+        <HelpBox helps={helps} isMe={isMe} onResolved={() => setToast({ at: Date.now(), message: "解決済みにしました" })} />
       )}
 
       {isMe && ownTasks.length > 0 && (
         <div className="mt-auto flex flex-wrap gap-2">
           <button type="button" aria-haspopup="dialog" className={primaryButtonClass} onClick={() => setDialog("progress")}>
             進捗を更新
+          </button>
+          <button type="button" aria-haspopup="dialog" className={secondaryButtonClass} onClick={() => setDialog("help")}>
+            困りごとを出す
           </button>
         </div>
       )}
@@ -132,13 +140,21 @@ export function MemberCardView({ card, tasks, isMe, today }: Props) {
       {dialog === "progress" && (
         <ProgressDialog
           tasks={ownTasks}
-          initialTaskId={[current, card.overdue[0], next].find((t) => t && ownTasks.some((o) => o.id === t.id))?.id ?? ownTasks[0]!.id}
+          initialTaskId={defaultTaskId}
           today={today}
           onClose={() => setDialog(null)}
-          onSaved={() => setSavedAt(Date.now())}
+          onSaved={() => setToast({ at: Date.now(), message: "保存しました" })}
         />
       )}
-      {savedAt !== null && <Toast key={savedAt} message="保存しました" />}
+      {dialog === "help" && (
+        <HelpDialog
+          tasks={ownTasks}
+          initialTaskId={defaultTaskId}
+          onClose={() => setDialog(null)}
+          onPosted={() => setToast({ at: Date.now(), message: "困りごとを出しました" })}
+        />
+      )}
+      {toast !== null && <Toast key={toast.at} message={toast.message} />}
     </article>
   );
 }

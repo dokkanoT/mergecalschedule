@@ -6,7 +6,7 @@ import { StatusPill } from "@/components/common/status-pill";
 import { PageHeader } from "@/components/shell/page-header";
 import { requireUser } from "@/lib/auth";
 import { boardSummary, buildMemberCard, filterMembers, memberTaskList, sortMemberCards } from "@/lib/board";
-import { type LoadedBoardTask, loadBoard } from "@/lib/board/server";
+import { type LoadedBoardTask, loadBoard, type OpenHelp } from "@/lib/board/server";
 import { todayInTokyo } from "@/lib/calendar";
 import { formatLongDate } from "@/lib/format";
 
@@ -15,7 +15,7 @@ import { formatLongDate } from "@/lib/format";
 export default async function BoardPage({ searchParams }: PageProps<"/board">) {
   const me = await requireUser();
   const today = todayInTokyo();
-  const { projects, members, tasks } = await loadBoard(me.id);
+  const { projects, members, tasks, helps } = await loadBoard(me.id, today);
   const { project } = await searchParams;
   const selected = typeof project === "string" && projects.some((p) => p.id === project) ? project : null;
 
@@ -25,6 +25,8 @@ export default async function BoardPage({ searchParams }: PageProps<"/board">) {
     list.push(t);
     tasksByMember.set(t.assigneeId, list);
   }
+  const helpsByMember = new Map<string, OpenHelp[]>();
+  for (const h of helps) helpsByMember.set(h.assigneeId, [...(helpsByMember.get(h.assigneeId) ?? []), h]);
   const cards = sortMemberCards(
     filterMembers(members, selected).map((m) => buildMemberCard(m, tasksByMember.get(m.userId) ?? [], today)),
   );
@@ -59,6 +61,7 @@ export default async function BoardPage({ searchParams }: PageProps<"/board">) {
                 key={card.member.userId}
                 card={card}
                 tasks={memberTaskList(tasksByMember.get(card.member.userId) ?? [])}
+                helps={helpsByMember.get(card.member.userId) ?? []}
                 isMe={card.member.userId === me.id}
                 today={today}
               />

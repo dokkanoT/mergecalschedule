@@ -1,12 +1,14 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { tasks } from "@/db/schema";
+import { helpRequests, tasks } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { findProjectForUser, isUuid } from "@/lib/auth/permissions";
 import { type ProgressUpdateField, type ProgressUpdateInput, validateProgressUpdate } from "@/lib/board";
 import { type IsoDate, isIsoDate, todayInTokyo } from "@/lib/calendar";
+import { validateHelpBody } from "@/lib/rules";
 
 export type ProgressUpdateResult = {
   ok?: boolean;
@@ -30,6 +32,7 @@ const blankToNull = (value: string) => (value.trim() === "" ? null : value.trim(
  */
 export async function updateMyProgress(taskId: string, raw: RawInput): Promise<ProgressUpdateResult> {
   const me = await requireUser();
+  if (!isUuid(taskId)) return { formError: "このタスクは更新できません。担当しているタスクだけ更新できます。" };
   const [task] = await db
     .select({
       id: tasks.id,
@@ -67,5 +70,63 @@ export async function updateMyProgress(taskId: string, raw: RawInput): Promise<P
   }
   revalidatePath("/board");
   revalidatePath(`/projects/${task.projectId}`, "layout");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// 困りごと（R5）
+// ---------------------------------------------------------------------------
+
+export type HelpResult = { ok?: boolean; error?: string };
+
+/** 困りごとを出す。出せるのは、そのタスクの担当者だけ */
+export async function postHelp(taskId: string, body: string): Promise<HelpResult> {
+  const me = await requireUser();
+  if (!isUuid(taskId)) return { error: "このタスクには困りごとを出せません。担当しているタスクを選んでください。" };
+  const [task] = await db
+    .select({ id: tasks.id, projectId: tasks.projectId, assigneeId: tasks.assigneeId })
+    .from(tasks)
+    .where(eq(tasks.id, taskId));
+  if (!task || task.assigneeId !== me.id) {
+    return { error: "このタスクには困りごとを出せません。担当しているタスクを選んでください。" };
+  }
+  const issue = validateHelpBody(body)[0];
+  if (issue) return { error: issue.message };
+
+  try {
+    await db.insert(helpRequests).values({ taskId: task.id, userId: me.id, body: body.trim() });
+  } catch (e) {
+    console.error("postHelp", e);
+    return { error: "送れませんでした。もう一度試してください。" };
+  }
+  revalidatePath("/board");
+  revalidatePath(`/projects/${task.projectId}`, "layout");
+  return { ok: true };
+}
+
+/**
+ * 「手を貸す」：困りごとを解決済みにする。押した人を解決者として記録する。
+ * 押せるのは、そのタスクのプロジェクトのメンバー（担当者本人も含む）。
+ */
+export async function resolveHelp(helpId: string): Promise<HelpResult> {
+  const me = await requireUser();
+  if (!isUuid(helpId)) return { error: "この困りごとは見つかりません。画面を読み込み直してください。" };
+  const [help] = await db
+    .select({ id: helpRequests.id, projectId: tasks.projectId, resolvedAt: helpRequests.resolvedAt })
+    .from(helpRequests)
+    .innerJoin(tasks, eq(tasks.id, helpRequests.taskId))
+    .where(eq(helpRequests.id, helpId));
+  if (!help || !(await findProjectForUser(help.projectId, me.id))) {
+    return { error: "この困りごとは見つかりません。画面を読み込み直してください。" };
+  }
+
+  const updated = await db
+    .update(helpRequests)
+    .set({ resolvedAt: new Date(), resolvedBy: me.id })
+    .where(and(eq(helpRequests.id, help.id), isNull(helpRequests.resolvedAt)))
+    .returning({ id: helpRequests.id });
+  revalidatePath("/board");
+  revalidatePath(`/projects/${help.projectId}`, "layout");
+  if (updated.length === 0) return { error: "この困りごとは、もう解決済みです。" };
   return { ok: true };
 }

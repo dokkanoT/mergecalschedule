@@ -6,6 +6,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { helpRequests, projectMembers, projects, tasks, user } from "@/db/schema";
 import type { IsoDate } from "@/lib/calendar";
+import { formatDateTime } from "@/lib/format";
 import type { BoardMember, BoardTask } from "./index";
 
 /** 自分のタスクだけに付ける、進捗更新用の項目 */
@@ -18,14 +19,28 @@ export type OwnTaskFields = {
 
 export type LoadedBoardTask = BoardTask & { assigneeId: string; own: OwnTaskFields | null };
 
-export async function loadBoard(viewerId: string) {
+/** カードに出す未解決の困りごと（見る人がメンバーのプロジェクトのタスクのものだけ） */
+export type OpenHelp = {
+  id: string;
+  taskId: string;
+  assigneeId: string;
+  taskName: string;
+  projectColor: string;
+  projectIcon: string;
+  body: string;
+  posterName: string;
+  /** 投稿日時の表示（"11/19（木）14:05"） */
+  createdLabel: string;
+};
+
+export async function loadBoard(viewerId: string, today: IsoDate) {
   const myProjects = await db
     .select({ id: projects.id, name: projects.name, color: projects.color, icon: projects.icon })
     .from(projectMembers)
     .innerJoin(projects, eq(projects.id, projectMembers.projectId))
     .where(eq(projectMembers.userId, viewerId))
     .orderBy(asc(projects.deadline), asc(projects.name));
-  if (myProjects.length === 0) return { projects: myProjects, members: [] as BoardMember[], tasks: [] as LoadedBoardTask[] };
+  if (myProjects.length === 0) return { projects: myProjects, members: [] as BoardMember[], tasks: [] as LoadedBoardTask[], helps: [] as OpenHelp[] };
 
   const projectIds = myProjects.map((p) => p.id);
   const memberRows = await db
@@ -122,5 +137,27 @@ export async function loadBoard(viewerId: string) {
         },
   );
 
-  return { projects: myProjects, members: [...membersById.values()], tasks: boardTasks };
+  const poster = alias(user, "poster");
+  const helpRows = await db
+    .select({
+      id: helpRequests.id,
+      taskId: tasks.id,
+      assigneeId: tasks.assigneeId,
+      taskName: tasks.name,
+      projectColor: projects.color,
+      projectIcon: projects.icon,
+      body: helpRequests.body,
+      posterName: poster.name,
+      createdAt: helpRequests.createdAt,
+    })
+    .from(helpRequests)
+    .innerJoin(tasks, eq(tasks.id, helpRequests.taskId))
+    .innerJoin(projects, eq(projects.id, tasks.projectId))
+    .innerJoin(viewer, and(eq(viewer.projectId, tasks.projectId), eq(viewer.userId, viewerId)))
+    .innerJoin(poster, eq(poster.id, helpRequests.userId))
+    .where(and(isNull(helpRequests.resolvedAt), inArray(tasks.assigneeId, memberIds)))
+    .orderBy(asc(helpRequests.createdAt));
+  const helps: OpenHelp[] = helpRows.map(({ createdAt, ...h }) => ({ ...h, createdLabel: formatDateTime(createdAt, today) }));
+
+  return { projects: myProjects, members: [...membersById.values()], tasks: boardTasks, helps };
 }
