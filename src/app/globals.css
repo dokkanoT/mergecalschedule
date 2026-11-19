@@ -12,6 +12,7 @@
   --color-primary-soft-ink: #3730a3;
   --color-offday-head: #e9eaee;
   --color-offday: #f1f2f4;
+  --color-phase-row: #fafafb;
   --color-ok-bg: #eaf1ff;
   --color-ok-ink: #1d4ed8;
   --color-late-bg: #fff1e6;
@@ -93,4 +94,8 @@
   html {
     @apply font-sans;
   }
+}
+/* ガントの予備期間（バッファ）の斜線の帯 */
+.gantt-buffer {
+  background-image: repeating-linear-gradient(135deg, rgb(240 123 63 / 0.22) 0 4px, transparent 4px 10px);
 }
