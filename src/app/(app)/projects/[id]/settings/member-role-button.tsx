@@ -3,13 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { ProjectRole } from "@/lib/invitations";
-import type { RoleChangeResult } from "./actions";
+import type { MemberChangeResult } from "./actions";
 
 type Props = {
   memberName: string;
   currentRole: ProjectRole;
   isSelf: boolean;
-  action: (role: ProjectRole) => Promise<RoleChangeResult>;
+  action: (role: ProjectRole) => Promise<MemberChangeResult>;
 };
 
 /** 役割の切り替え（オーナー ⇄ メンバー） */
