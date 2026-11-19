@@ -67,7 +67,24 @@ export function validateFileNameTemplate(template: string | null | undefined, fi
     : [];
 }
 
+// ---------------------------------------------------------------------------
+// 困りごと（ヘルプ）
+// ---------------------------------------------------------------------------
+
 /** 未解決の困りごとの件数（resolvedAt が null のもの） */
 export function countOpenHelpRequests(requests: readonly { resolvedAt: Date | string | null }[]): number {
   return requests.filter((r) => r.resolvedAt === null).length;
+}
+
+/** 困りごとの本文の最大文字数 */
+export const HELP_BODY_MAX = 500;
+
+/** 困りごとの本文：空・空白だけは不可、HELP_BODY_MAX 文字まで */
+export function validateHelpBody(body: string | null | undefined): RuleIssue[] {
+  const text = (body ?? "").trim();
+  if (text === "") return [{ field: "body", message: "困っていることを入力してください。" }];
+  if ([...text].length > HELP_BODY_MAX) {
+    return [{ field: "body", message: `困りごとは ${HELP_BODY_MAX} 文字以内で書いてください。` }];
+  }
+  return [];
 }
