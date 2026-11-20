@@ -24,7 +24,7 @@ export default async function GanttPage({ params, searchParams }: PageProps<"/pr
   const latest = latestSelectableStatusDate(today, project.weekEndWeekday);
   const statusDate = typeof date === "string" && isIsoDate(date) && date <= latest ? date : today;
 
-  const { nodes, tasks, fromSnapshot } = await loadGantt(id, statusDate);
+  const { nodes, tasks, fromSnapshot } = await loadGantt(id, statusDate, today);
   const range = ganttRange({ tasks, deadline: project.deadline, statusDate });
   const options = statusDateOptions({ rangeStart: range.start, today, weekEndWeekday: project.weekEndWeekday });
   if (!options.some((o) => o.date === statusDate)) {

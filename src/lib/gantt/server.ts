@@ -8,6 +8,7 @@ export type GanttTask = {
   id: string;
   phaseId: string;
   name: string;
+  deliverable: string;
   assigneeName: string;
   plannedStart: IsoDate;
   plannedEnd: IsoDate;
@@ -17,10 +18,11 @@ export type GanttTask = {
 };
 
 /**
- * ガントに出す WBS とタスク。statusDate の進捗スナップショット（週次レポート出力時に保存）があれば、
- * その日の進捗率を使う（過去のイナズマ線を再現する）。なければいまの進捗率。
+ * ガントに出す WBS とタスク。statusDate が今日より前で、その日の進捗スナップショット（週次レポート出力時に保存）があれば、
+ * その日の進捗率を使う（過去のイナズマ線を再現する）。今日以降・スナップショットなしなら、いまの進捗率。
  */
-export async function loadGantt(projectId: string, statusDate: IsoDate) {
+export async function loadGantt(projectId: string, statusDate: IsoDate, today: IsoDate) {
+  const useSnapshot = statusDate < today;
   const [nodes, taskRows, snapshots] = await Promise.all([
     db
       .select({ id: wbsNodes.id, parentId: wbsNodes.parentId, level: wbsNodes.level, name: wbsNodes.name })
@@ -32,6 +34,7 @@ export async function loadGantt(projectId: string, statusDate: IsoDate) {
         id: tasks.id,
         phaseId: tasks.phaseId,
         name: tasks.name,
+        deliverable: tasks.deliverable,
         assigneeName: user.name,
         plannedStart: tasks.plannedStart,
         plannedEnd: tasks.plannedEnd,
@@ -43,10 +46,12 @@ export async function loadGantt(projectId: string, statusDate: IsoDate) {
       .innerJoin(user, eq(user.id, tasks.assigneeId))
       .where(eq(tasks.projectId, projectId))
       .orderBy(asc(tasks.sortOrder), asc(tasks.plannedStart), asc(tasks.createdAt)),
-    db
-      .select({ taskId: progressSnapshots.taskId, progressPct: progressSnapshots.progressPct })
-      .from(progressSnapshots)
-      .where(and(eq(progressSnapshots.projectId, projectId), eq(progressSnapshots.statusDate, statusDate))),
+    useSnapshot
+      ? db
+          .select({ taskId: progressSnapshots.taskId, progressPct: progressSnapshots.progressPct })
+          .from(progressSnapshots)
+          .where(and(eq(progressSnapshots.projectId, projectId), eq(progressSnapshots.statusDate, statusDate)))
+      : Promise.resolve([]),
   ]);
   const snapshot = new Map(snapshots.map((s) => [s.taskId, s.progressPct]));
   return {
