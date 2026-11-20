@@ -126,21 +126,26 @@ export type LightningVertex = { x: number; y: number; status: "behind" | "on_tra
 
 /**
  * イナズマ線の頂点（上の行から順）。タスクの行は lib/progress の点、目的・フェーズの行は進捗管理日の縦線の上。
- * y は行の中央。
+ * y は行の中央。size を渡すと、そのマスの大きさで計算する（PDF 用）。
  */
 export function lightningVertices<T extends PlannedTask & { id: string; progressPct: number; phaseId: string }>(
   rows: readonly GanttRow<T>[],
   statusDate: IsoDate,
   rangeStart: IsoDate,
+  size: { columnWidth: number; rowHeight: number } = { columnWidth: COLUMN_WIDTH, rowHeight: ROW_HEIGHT },
 ): LightningVertex[] {
   const tasks = rows.flatMap((r) => (r.kind === "task" ? [r.task] : []));
   const points = new Map(lightningPoints(tasks, statusDate).map((p) => [p.task.id, p]));
-  const lineX = xOf(rangeStart, statusLinePosition(statusDate));
+  const lineX = xOf(rangeStart, statusLinePosition(statusDate), size.columnWidth);
   return rows.map((row, i) => {
-    const y = i * ROW_HEIGHT + ROW_HEIGHT / 2;
+    const y = i * size.rowHeight + size.rowHeight / 2;
     if (row.kind !== "task") return { x: lineX, y, status: "line" };
     const p = points.get(row.id) as LightningPoint<T>;
-    return { x: p.onStatusLine ? lineX : xOf(rangeStart, p.position), y, status: p.onStatusLine ? "line" : p.status };
+    return {
+      x: p.onStatusLine ? lineX : xOf(rangeStart, p.position, size.columnWidth),
+      y,
+      status: p.onStatusLine ? "line" : p.status,
+    };
   });
 }
 
